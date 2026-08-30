@@ -37,8 +37,11 @@ from analyzer import (
     evaluate_overall_winner
 )
 from git_service import (
+    DEFAULT_PROJECT_GITHUB_URL,
+    DEFAULT_PROJECT_WEB_URL,
     get_git_info,
     get_git_details,
+    get_git_status_summary,
     set_git_remote,
     check_large_build_dirs,
     delete_build_dirs,
@@ -996,190 +999,148 @@ CATEGORY_STYLES = {
 # -----------------------------------------------------------------------------
 top_git_col1, top_git_col2, top_git_col3, top_git_col4 = st.columns([0.34, 0.22, 0.22, 0.22], gap="small")
 
+git_info_quick = get_git_info()
+git_details = get_git_details()
+git_summary = get_git_status_summary()
+target_github_url = git_details.get("web_url") or DEFAULT_PROJECT_WEB_URL
+target_remote_url = git_details.get("remote") or DEFAULT_PROJECT_GITHUB_URL
+current_branch = git_details.get("branch") or "main"
+
 with top_git_col1:
-    git_info_quick = get_git_info()
-    git_status_icon = "🟢" if git_info_quick.get("is_repo") and git_info_quick.get("remote") != "-" else "⚪"
+    git_status_icon = "🟢" if git_info_quick.get("is_repo") else "⚪"
+    changes_badge = f"<span style='font-size: 11px; color: #FBBF24; background: rgba(245, 158, 11, 0.2); border: 1px solid #F59E0B; padding: 2px 7px; border-radius: 6px; font-weight: 700;'>📝 {git_summary['total_changes']} تعديل</span>" if git_summary.get("total_changes", 0) > 0 else "<span style='font-size: 11px; color: #34D399; background: rgba(16, 185, 129, 0.2); border: 1px solid #10B981; padding: 2px 7px; border-radius: 6px; font-weight: 700;'>✨ متزامن</span>"
+    
     st.markdown(f"""
-    <div style="display: flex; align-items: center; gap: 8px; padding: 7px 14px; background: #0F172A; border: 1.5px solid #3B82F6; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-        <span style="font-size: 20px;">🐙</span>
-        <span style="font-weight: 800; font-size: 13.5px; color: #FFFFFF;">مستودع المشروع</span>
-        <span style="font-size: 11.5px; color: #93C5FD; background: rgba(59, 130, 246, 0.25); border: 1px solid #3B82F6; padding: 2px 8px; border-radius: 8px; font-weight: 700;">
-            {git_status_icon} {git_info_quick.get('branch', 'main')}
-        </span>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; background: #0F172A; border: 1.5px solid #3B82F6; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🐙</span>
+            <span style="font-weight: 800; font-size: 13px; color: #FFFFFF;">Mobiles-spec</span>
+            <span style="font-size: 11px; color: #93C5FD; background: rgba(59, 130, 246, 0.25); border: 1px solid #3B82F6; padding: 2px 7px; border-radius: 6px; font-weight: 700;">
+                {git_status_icon} {current_branch}
+            </span>
+        </div>
+        <div>
+            {changes_badge}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 with top_git_col2:
-    git_details = get_git_details()
-    target_github_url = git_details.get("web_url")
-    if target_github_url:
+    if target_github_url and target_github_url != "-":
         st.link_button("👁️ View GitHub", url=target_github_url, type="secondary", use_container_width=True)
     else:
         with st.popover("👁️ View GitHub", use_container_width=True):
             st.markdown("### 👁️ ربط واستعراض مستودع GitHub")
-            st.warning("⚠️ المستودع المحلي لم يتم ربطه برابط GitHub بعد.")
-            st.info("💡 **لفتح مشروعك مباشرة على المتصفح بنقرة واحدة، يرجى إدخال رابط مستودعك على GitHub وحفظه:**")
-            
-            st.link_button("➕ إنشاء مستودع جديد أولاً على حسابك (New Repo)", url="https://github.com/new", type="secondary", use_container_width=True)
-            
+            st.info(f"🔗 المستودع الموصى به: `{DEFAULT_PROJECT_GITHUB_URL}`")
             quick_repo_url = st.text_input(
-                "🔗 الصق رابط مستودعك الخاص (GitHub Repo URL):",
-                placeholder="https://github.com/اسم_حسابك/اسم_المستودع.git",
+                "🔗 رابط المستودع الخاص بك على GitHub:",
+                value=DEFAULT_PROJECT_GITHUB_URL,
                 key="quick_set_repo_url"
             )
             if st.button("💾 حفظ وربط المستودع الآن", key="btn_save_quick_repo", type="primary", use_container_width=True):
-                clean_in = quick_repo_url.strip()
-                if not clean_in:
-                    st.error("⚠️ يرجى إدخال رابط المستودع.")
-                elif "/username/" in clean_in.lower() or "repository-name" in clean_in.lower():
-                    st.error("⚠️ كلمة 'username' هي مجرد مثال! يرجى استبدالها باسم حسابك الحقيقي على GitHub (مثال: https://github.com/your-name/mobiles-spec.git).")
+                clean_in = quick_repo_url.strip() if quick_repo_url.strip() else DEFAULT_PROJECT_GITHUB_URL
+                s_set, msg_set = set_git_remote(clean_in)
+                if s_set:
+                    st.success("✅ تم حفظ رابط المستودع بنجاح! سيفتح الزر مستودعك مباشرة.")
+                    st.rerun()
                 else:
-                    s_set, msg_set = set_git_remote(clean_in)
-                    if s_set:
-                        st.success("✅ تم حفظ رابط المستودع بنجاح! سيفتح الزر مستودعك مباشرة.")
-                        st.rerun()
-                    else:
-                        st.error(f"خطأ: {msg_set}")
+                    st.error(f"خطأ: {msg_set}")
 
 with top_git_col3:
     with st.popover("🚀 Export to GitHub", use_container_width=True):
-        st.markdown("### 🚀 تصدير ورفع المشروع إلى GitHub")
-        st.caption("تهيئة المستودع وربطه ورفع الملفات بالكامل إلى GitHub:")
+        st.markdown("### 🚀 تصدير وتهيئة المشروع على GitHub")
+        st.markdown(f"""
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid #3B82F6; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 13px;">
+            <b>🔗 المستودع المستهدف:</b> <a href="{DEFAULT_PROJECT_WEB_URL}" target="_blank" style="color: #60A5FA; text-decoration: none; font-weight: 700;">hzayed3030-cell/Mobiles-spec</a><br>
+            <b>🌿 الفرع المستهدف:</b> <code style="color: #93C5FD;">main</code>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # 1. فحص وجود فهارس build أو dist الخاصة بـ EXE وإطلاق صافرة التحذير
+        # فحص فهارس build / dist
         detected_build_dirs = check_large_build_dirs()
         if detected_build_dirs and not st.session_state.get("dismiss_build_warn_export", False):
-            # تشغيل صافرة تحذير صوتية بواسطة Web Audio API
-            components.html("""
-            <script>
-            (function() {
-                try {
-                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                    if (AudioCtx) {
-                        const ctx = new AudioCtx();
-                        function playTone(freq, start, duration, type='sawtooth') {
-                            const osc = ctx.createOscillator();
-                            const gain = ctx.createGain();
-                            osc.type = type;
-                            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-                            gain.gain.setValueAtTime(0.28, ctx.currentTime + start);
-                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-                            osc.connect(gain);
-                            gain.connect(ctx.destination);
-                            osc.start(ctx.currentTime + start);
-                            osc.stop(ctx.currentTime + start + duration);
-                        }
-                        // Siren alert tones: high-low-high-low pattern
-                        playTone(920, 0.0, 0.28);
-                        playTone(600, 0.32, 0.28);
-                        playTone(920, 0.64, 0.28);
-                        playTone(600, 0.96, 0.40);
-                    }
-                } catch(e) {}
-            })();
-            </script>
-            """, height=0, width=0)
-            
             tot_mb = sum(d["size_mb"] for d in detected_build_dirs)
             dir_names = " و ".join([f"[{d['name']}]" for d in detected_build_dirs])
             
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); color: #FFFFFF; padding: 18px 22px; border-radius: 14px; border: 2.5px solid #EF4444; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 900; color: #FEE2E2;">
-                    <span style="font-size: 24px;">🚨</span>
-                    <span>صافرة تحذير: لا يمكن رفع المشروع إلى GitHub!</span>
+            <div style="background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); color: #FFFFFF; padding: 14px 18px; border-radius: 12px; border: 2px solid #EF4444; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #FEE2E2;">
+                    <span>🚨</span>
+                    <span>تنبيه أمان: تم اكتشاف مجلدات ملفات تنفيذية ضخمة ({tot_mb} MB)</span>
                 </div>
-                <div style="margin-top: 10px; font-size: 13.5px; line-height: 1.6; color: #FECACA; font-weight: 700;">
-                    تم اكتشاف فهارس <b style="color: #FFFFFF; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 6px;">{dir_names}</b> بحجم إجمالي تقريبي <b>{tot_mb} MB</b>.
-                    <br>
-                    ⚠️ <b>السبب:</b> هذه الفهارس تحتوي على ملفات بناء تنفيذية ضخمة خاصة بالملف <b>EXE</b>، ومستودعات GitHub تمنع أو تتضرر من رفع هذه الأحجام الكبيرة.
+                <div style="margin-top: 6px; font-size: 12.5px; color: #FECACA;">
+                    المجلدات: <b>{dir_names}</b>. يفضل حذفها قبل الرفع لمنع تجاوز سعة مستودع GitHub.
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
             col_b_act1, col_b_act2 = st.columns([0.62, 0.38], gap="small")
             with col_b_act1:
-                if st.button("🗑️ حذف فهارس Build و Dist للمتابعة", key="btn_del_build_dirs", type="primary", use_container_width=True):
+                if st.button("🗑️ حذف الفهارس للمتابعة", key="btn_del_build_dirs", type="primary", use_container_width=True):
                     s_del, msg_del = delete_build_dirs()
                     if s_del:
-                        st.success("✅ تم حذف فهارس Build و Dist بنجاح وتحديث .gitignore! يمكنك الآن المتابعة في الرفع.")
+                        st.success("✅ تم حذف فهارس Build و Dist بنجاح!")
                         st.session_state["dismiss_build_warn_export"] = False
                         st.rerun()
                     else:
-                        st.error(f"خطأ أثناء الحذف: {msg_del}")
+                        st.error(f"خطأ: {msg_del}")
             with col_b_act2:
-                if st.button("🔙 إلغاء والعودة", key="btn_cancel_del_build_dirs", type="secondary", use_container_width=True):
+                if st.button("🔙 تجاهل والمتابعة", key="btn_cancel_del_build_dirs", type="secondary", use_container_width=True):
                     st.session_state["dismiss_build_warn_export"] = True
-                    components.html("""
-                    <script>
-                    (function() {
-                        try {
-                            const doc = window.parent.document;
-                            doc.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', bubbles: true}));
-                            doc.body.click();
-                        } catch(e) {}
-                    })();
-                    </script>
-                    """, height=0, width=0)
-                    st.toast("🔙 تم إلغاء العملية والعودة دون أي تعديل على الملفات.", icon="ℹ️")
                     st.rerun()
             st.divider()
-        elif detected_build_dirs and st.session_state.get("dismiss_build_warn_export", False):
-            st.info("ℹ️ تم إلغاء عملية الرفع السابقة. تم الإبقاء على ملفات ومجلدات Build / Dist دون أي تعديل.")
-            if st.button("🔄 إعادة فحص الفهارس والتحذير", key="btn_reset_build_warn_export", use_container_width=True):
-                st.session_state["dismiss_build_warn_export"] = False
-                st.rerun()
-            st.divider()
-
-        st.link_button("➕ 1. اضغط هنا لإنشاء المستودع أولاً على GitHub", url="https://github.com/new", type="secondary", use_container_width=True)
-        st.caption("👈 بعد إنشاء المستودع انسخ الرابط والصقه في الحقل أدناه:")
         
         export_url = st.text_input(
-            "🔗 2. رابط المستودع الخاص بك على GitHub (Remote URL):",
-            placeholder="https://github.com/اسم_حسابك/اسم_المستودع.git",
+            "🔗 رابط المستودع على GitHub (Remote URL):",
+            value=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL,
             key="export_github_url_key"
         )
         export_branch = st.text_input(
             "🌿 اسم الفرع (Branch):",
-            value="main",
+            value=current_branch if current_branch != "-" else "main",
             key="export_github_branch_key"
         )
         export_commit = st.text_input(
             "📝 رسالة الـ Commit (Commit Message):",
-            value="Initial commit: Mobile Specs Dashboard",
-            placeholder="اكتب اسم ورسالة الـ commit...",
+            value="feat: initial export of Mobiles-spec codebase",
             key="export_github_commit_key"
         )
         
         if st.button("🚀 بدء التصدير والرفع الآن (Push to GitHub)", key="btn_exec_export_github", type="primary", use_container_width=True):
-            clean_exp = export_url.strip()
-            if not export_commit.strip():
-                st.error("⚠️ يرجى إدخال نص ورسالة الـ Commit.")
-            elif not clean_exp:
-                st.error("⚠️ يرجى إدخال رابط مستودع GitHub الخاص بك.")
-            elif "/username/" in clean_exp.lower() or "repository" in clean_exp.lower() and "username" in clean_exp.lower():
-                st.error("⚠️ تنبيه: كلمة 'username' في الرابط هي مثال توضيحي فقط! يرجى إنشاء المستودع على حسابك واستخدام رابطك الحقيقي (مثال: https://github.com/حسابك/mobiles-spec.git).")
-            else:
-                with st.spinner("جاري تهيئة ورفع المشروع إلى GitHub..."):
-                    success, log_msg = export_project_to_github(
-                        repo_url=clean_exp,
-                        commit_message=export_commit,
-                        branch_name=export_branch
-                    )
-                    if success:
-                        st.success("✅ تم تصدير ورفع المشروع إلى GitHub بنجاح!")
-                        if clean_exp:
-                            clean_web = clean_exp.replace(".git", "").replace("git@github.com:", "https://github.com/").strip()
-                            st.link_button("🌐 فتح المستودع الآن على المتصفح", url=clean_web, type="primary", use_container_width=True)
-                    else:
-                        st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
-                    st.code(log_msg, language="bash")
+            clean_exp = export_url.strip() if export_url.strip() else DEFAULT_PROJECT_GITHUB_URL
+            with st.spinner("جاري تهيئة ورفع المشروع إلى GitHub..."):
+                success, log_msg = export_project_to_github(
+                    repo_url=clean_exp,
+                    commit_message=export_commit,
+                    branch_name=export_branch
+                )
+                if success:
+                    st.success("✅ تم تصدير ورفع المشروع إلى GitHub بنجاح!")
+                    clean_web = clean_exp.replace(".git", "").replace("git@github.com:", "https://github.com/").strip()
+                    st.link_button("🌐 فتح المستودع الآن على GitHub", url=clean_web, type="primary", use_container_width=True)
+                else:
+                    st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
+                st.code(log_msg, language="bash")
 
 with top_git_col4:
     with st.popover("🔄 Update GitHub", use_container_width=True):
-        st.markdown("### 🔄 تحديث مستودع GitHub")
-        st.caption("حفظ ورفع آخر التعديلات والتحديثات وعمل Refresh للمستودع:")
+        st.markdown("### 🔄 تحديث ومزامنة مستودع GitHub")
+        st.markdown(f"""
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 13px;">
+            <b>🔗 المستودع المرتبط:</b> <a href="{DEFAULT_PROJECT_WEB_URL}" target="_blank" style="color: #34D399; text-decoration: none; font-weight: 700;">hzayed3030-cell/Mobiles-spec</a><br>
+            <b>🌿 الفرع الحالي:</b> <code style="color: #A7F3D0;">{current_branch}</code> | <b>آخر Commit:</b> <small>{git_info_quick.get('last_commit', '-')}</small>
+        </div>
+        """, unsafe_allow_html=True)
         
+        # عرض حالة التعديلات الحالية
+        if git_summary.get("total_changes", 0) > 0:
+            st.info(f"📝 يوجد **{git_summary['total_changes']}** ملفات بها تعديلات جاهزة للمزامنة:")
+            with st.expander("📂 استعراض قائمة الملفات المعدلة", expanded=False):
+                for f_item in git_summary.get("files", [])[:15]:
+                    st.caption(f"{f_item['icon']} `{f_item['name']}` ({f_item['type']})")
+        else:
+            st.success("🟢 المستودع نظيف ومحدث محلياً، يمكنك عمل مزامنة ورفع فوري.")
+            
         # فحص وجود فهارس build / dist
         detected_build_update = check_large_build_dirs()
         if detected_build_update and not st.session_state.get("dismiss_build_warn_update", False):
@@ -1197,18 +1158,6 @@ with top_git_col4:
             with col_u_act2:
                 if st.button("🔙 إلغاء والعودة", key="btn_cancel_del_update", type="secondary", use_container_width=True):
                     st.session_state["dismiss_build_warn_update"] = True
-                    components.html("""
-                    <script>
-                    (function() {
-                        try {
-                            const doc = window.parent.document;
-                            doc.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', bubbles: true}));
-                            doc.body.click();
-                        } catch(e) {}
-                    })();
-                    </script>
-                    """, height=0, width=0)
-                    st.toast("🔙 تم إلغاء العملية والعودة دون أي تعديل على الملفات.", icon="ℹ️")
                     st.rerun()
             st.divider()
         elif detected_build_update and st.session_state.get("dismiss_build_warn_update", False):
@@ -1220,29 +1169,30 @@ with top_git_col4:
         
         update_branch = st.text_input(
             "🌿 اسم الفرع (Branch):",
-            value="main",
+            value=current_branch if current_branch != "-" else "main",
             key="update_github_branch_key"
         )
         update_commit = st.text_input(
             "📝 رسالة الـ Commit (Commit Message):",
-            placeholder="اكتب ماذا قمت بتعديله أو تحديثه...",
+            value="feat: update Mobiles-spec data & specs",
             key="update_github_commit_key"
         )
         
         if st.button("🔄 حفظ ورفع التحديثات (Update & Refresh)", key="btn_exec_update_github", type="primary", use_container_width=True):
-            if not update_commit.strip():
-                st.error("⚠️ يرجى إدخال اسم ورسالة الـ Commit للتحديث.")
-            else:
-                with st.spinner("جاري حفظ ورفع التعديلات وعمل Refresh..."):
-                    success, log_msg = update_project_on_github(
-                        commit_message=update_commit,
-                        branch_name=update_branch
-                    )
-                    if success:
-                        st.success("✅ تم تحديث ومزامنة المستودع بنجاح!")
-                    else:
-                        st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
-                    st.code(log_msg, language="bash")
+            clean_commit_msg = update_commit.strip() if update_commit.strip() else "feat: update Mobiles-spec data & specs"
+            with st.spinner("جاري حفظ التعديلات والمزامنة والرفع إلى GitHub..."):
+                success, log_msg = update_project_on_github(
+                    commit_message=clean_commit_msg,
+                    branch_name=update_branch,
+                    repo_url=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL
+                )
+                if success:
+                    st.success("✅ تم تحديث ومزامنة المستودع بنجاح!")
+                    commit_history_url = f"{DEFAULT_PROJECT_WEB_URL}/commits/{update_branch}"
+                    st.link_button("📜 عرض سجل التحديثات على GitHub", url=commit_history_url, type="primary", use_container_width=True)
+                else:
+                    st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
+                st.code(log_msg, language="bash")
 
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 

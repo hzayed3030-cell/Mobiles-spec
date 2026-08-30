@@ -1046,164 +1046,175 @@ with top_git_col2:
                 else:
                     st.error(f"خطأ: {msg_set}")
 
-with top_git_col3:
-    with st.popover("🚀 Export to GitHub", use_container_width=True):
-        st.markdown("### 🚀 تصدير وتهيئة المشروع على GitHub")
+# -----------------------------------------------------------------------------
+# 5.4 نوافذ الحوار المنبثقة لـ GitHub (GitHub Export & Update Modal Dialogs)
+# -----------------------------------------------------------------------------
+@st.dialog("🚀 تصدير وتهيئة المشروع على GitHub", width="large")
+def show_export_github_dialog(target_remote_url: str, current_branch: str):
+    st.markdown(f"""
+    <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid #3B82F6; padding: 12px 16px; border-radius: 12px; margin-bottom: 14px; font-size: 13.5px;">
+        <b>🔗 المستودع المستهدف:</b> <a href="{DEFAULT_PROJECT_WEB_URL}" target="_blank" style="color: #60A5FA; text-decoration: none; font-weight: 700;">hzayed3030-cell/Mobiles-spec</a><br>
+        <b>🌿 الفرع المستهدف:</b> <code style="color: #93C5FD;">main</code>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # فحص فهارس build / dist
+    detected_build_dirs = check_large_build_dirs()
+    if detected_build_dirs and not st.session_state.get("dismiss_build_warn_export", False):
+        tot_mb = sum(d["size_mb"] for d in detected_build_dirs)
+        dir_names = " و ".join([f"[{d['name']}]" for d in detected_build_dirs])
+        
         st.markdown(f"""
-        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid #3B82F6; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 13px;">
-            <b>🔗 المستودع المستهدف:</b> <a href="{DEFAULT_PROJECT_WEB_URL}" target="_blank" style="color: #60A5FA; text-decoration: none; font-weight: 700;">hzayed3030-cell/Mobiles-spec</a><br>
-            <b>🌿 الفرع المستهدف:</b> <code style="color: #93C5FD;">main</code>
+        <div style="background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); color: #FFFFFF; padding: 14px 18px; border-radius: 12px; border: 2px solid #EF4444; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #FEE2E2;">
+                <span>🚨</span>
+                <span>تنبيه أمان: تم اكتشاف مجلدات ملفات تنفيذية ضخمة ({tot_mb} MB)</span>
+            </div>
+            <div style="margin-top: 6px; font-size: 12.5px; color: #FECACA;">
+                المجلدات: <b>{dir_names}</b>. يفضل حذفها قبل الرفع لمنع تجاوز سعة مستودع GitHub.
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # فحص فهارس build / dist
-        detected_build_dirs = check_large_build_dirs()
-        if detected_build_dirs and not st.session_state.get("dismiss_build_warn_export", False):
-            tot_mb = sum(d["size_mb"] for d in detected_build_dirs)
-            dir_names = " و ".join([f"[{d['name']}]" for d in detected_build_dirs])
-            
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); color: #FFFFFF; padding: 14px 18px; border-radius: 12px; border: 2px solid #EF4444; margin-bottom: 14px;">
-                <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #FEE2E2;">
-                    <span>🚨</span>
-                    <span>تنبيه أمان: تم اكتشاف مجلدات ملفات تنفيذية ضخمة ({tot_mb} MB)</span>
-                </div>
-                <div style="margin-top: 6px; font-size: 12.5px; color: #FECACA;">
-                    المجلدات: <b>{dir_names}</b>. يفضل حذفها قبل الرفع لمنع تجاوز سعة مستودع GitHub.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            col_b_act1, col_b_act2 = st.columns([0.62, 0.38], gap="small")
-            with col_b_act1:
-                if st.button("🗑️ حذف الفهارس للمتابعة", key="btn_del_build_dirs", type="primary", use_container_width=True):
-                    s_del, msg_del = delete_build_dirs()
-                    if s_del:
-                        st.success("✅ تم حذف فهارس Build و Dist بنجاح!")
-                        st.session_state["dismiss_build_warn_export"] = False
-                        st.rerun()
-                    else:
-                        st.error(f"خطأ: {msg_del}")
-            with col_b_act2:
-                if st.button("🔙 تجاهل والمتابعة", key="btn_cancel_del_build_dirs", type="secondary", use_container_width=True):
-                    st.session_state["dismiss_build_warn_export"] = True
-                    st.rerun()
-            st.divider()
-        
-        export_url = st.text_input(
-            "🔗 رابط المستودع على GitHub (Remote URL):",
-            value=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL,
-            key="export_github_url_key"
-        )
-        export_branch = st.text_input(
-            "🌿 اسم الفرع (Branch):",
-            value=current_branch if current_branch != "-" else "main",
-            key="export_github_branch_key"
-        )
-        export_commit = st.text_input(
-            "📝 رسالة الـ Commit (Commit Message):",
-            value="feat: initial export of Mobiles-spec codebase",
-            key="export_github_commit_key"
-        )
-        
-        if st.button("🚀 بدء التصدير والرفع الآن (Push to GitHub)", key="btn_exec_export_github", type="primary", use_container_width=True):
-            clean_exp = export_url.strip() if export_url.strip() else DEFAULT_PROJECT_GITHUB_URL
-            with st.spinner("جاري تهيئة ورفع المشروع إلى GitHub..."):
-                success, log_msg = export_project_to_github(
-                    repo_url=clean_exp,
-                    commit_message=export_commit,
-                    branch_name=export_branch
-                )
-                if success:
-                    clean_web = clean_exp.replace(".git", "").replace("git@github.com:", "https://github.com/").strip()
-                    st.session_state["github_success_event"] = {
-                        "title": "تم الرفع الي منصة Git Hub بنجاح",
-                        "repo_url": clean_web,
-                        "branch": export_branch,
-                        "action": "export",
-                        "log": log_msg
-                    }
+        col_b_act1, col_b_act2 = st.columns([0.62, 0.38], gap="small")
+        with col_b_act1:
+            if st.button("🗑️ حذف الفهارس للمتابعة", key="btn_del_build_dirs_modal", type="primary", use_container_width=True):
+                s_del, msg_del = delete_build_dirs()
+                if s_del:
+                    st.success("✅ تم حذف فهارس Build و Dist بنجاح!")
+                    st.session_state["dismiss_build_warn_export"] = False
                     st.rerun()
                 else:
-                    st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
-                    st.code(log_msg, language="bash")
+                    st.error(f"خطأ: {msg_del}")
+        with col_b_act2:
+            if st.button("🔙 تجاهل والمتابعة", key="btn_cancel_del_build_dirs_modal", type="secondary", use_container_width=True):
+                st.session_state["dismiss_build_warn_export"] = True
+                st.rerun()
+        st.divider()
+    
+    export_url = st.text_input(
+        "🔗 رابط المستودع على GitHub (Remote URL):",
+        value=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL,
+        key="export_github_url_key"
+    )
+    export_branch = st.text_input(
+        "🌿 اسم الفرع (Branch):",
+        value=current_branch if current_branch != "-" else "main",
+        key="export_github_branch_key"
+    )
+    export_commit = st.text_input(
+        "📝 رسالة الـ Commit (Commit Message):",
+        value="feat: initial export of Mobiles-spec codebase",
+        key="export_github_commit_key"
+    )
+    
+    if st.button("🚀 بدء التصدير والرفع الآن (Push to GitHub)", key="btn_exec_export_github", type="primary", use_container_width=True):
+        clean_exp = export_url.strip() if export_url.strip() else DEFAULT_PROJECT_GITHUB_URL
+        with st.spinner("جاري تهيئة ورفع المشروع إلى GitHub..."):
+            success, log_msg = export_project_to_github(
+                repo_url=clean_exp,
+                commit_message=export_commit,
+                branch_name=export_branch
+            )
+            if success:
+                clean_web = clean_exp.replace(".git", "").replace("git@github.com:", "https://github.com/").strip()
+                st.session_state["github_success_event"] = {
+                    "title": "تم الرفع الي منصة Git Hub بنجاح",
+                    "repo_url": clean_web,
+                    "branch": export_branch,
+                    "action": "export",
+                    "log": log_msg
+                }
+                st.rerun()
+            else:
+                st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
+                st.code(log_msg, language="bash")
+
+
+@st.dialog("🔄 تحديث ومزامنة مستودع GitHub", width="large")
+def show_update_github_dialog(target_remote_url: str, current_branch: str, git_summary: dict, git_info_quick: dict):
+    st.markdown(f"""
+    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; padding: 12px 16px; border-radius: 12px; margin-bottom: 14px; font-size: 13.5px;">
+        <b>🔗 المستودع المرتبط:</b> <a href="{DEFAULT_PROJECT_WEB_URL}" target="_blank" style="color: #34D399; text-decoration: none; font-weight: 700;">hzayed3030-cell/Mobiles-spec</a><br>
+        <b>🌿 الفرع الحالي:</b> <code style="color: #A7F3D0;">{current_branch}</code> | <b>آخر Commit:</b> <small>{git_info_quick.get('last_commit', '-')}</small>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # عرض حالة التعديلات الحالية
+    if git_summary.get("total_changes", 0) > 0:
+        st.info(f"📝 يوجد **{git_summary['total_changes']}** ملفات بها تعديلات جاهزة للمزامنة:")
+        with st.expander("📂 استعراض قائمة الملفات المعدلة", expanded=False):
+            for f_item in git_summary.get("files", [])[:15]:
+                st.caption(f"{f_item['icon']} `{f_item['name']}` ({f_item['type']})")
+    else:
+        st.success("🟢 المستودع نظيف ومحدث محلياً، يمكنك عمل مزامنة ورفع فوري.")
+        
+    # فحص وجود فهارس build / dist
+    detected_build_update = check_large_build_dirs()
+    if detected_build_update and not st.session_state.get("dismiss_build_warn_update", False):
+        st.error("🚨 تنبيه: توجد فهارس Build / Dist خاصة بـ EXE في المشروع. يرجى حذفها أولاً لتتمكن من التحديث.")
+        col_u_act1, col_u_act2 = st.columns([0.62, 0.38], gap="small")
+        with col_u_act1:
+            if st.button("🗑️ حذف فهارس Build و Dist الآن", key="btn_del_build_update_modal", type="primary", use_container_width=True):
+                s_del, msg_del = delete_build_dirs()
+                if s_del:
+                    st.success("✅ تم الحذف بنجاح!")
+                    st.session_state["dismiss_build_warn_update"] = False
+                    st.rerun()
+                else:
+                    st.error(f"خطأ: {msg_del}")
+        with col_u_act2:
+            if st.button("🔙 إلغاء والعودة", key="btn_cancel_del_update_modal", type="secondary", use_container_width=True):
+                st.session_state["dismiss_build_warn_update"] = True
+                st.rerun()
+        st.divider()
+    elif detected_build_update and st.session_state.get("dismiss_build_warn_update", False):
+        st.info("ℹ️ تم إلغاء التحديث السابق. فهارس Build / Dist موجودة كما هي دون تعديل.")
+        if st.button("🔄 إعادة فحص الفهارس للتحديث", key="btn_reset_build_warn_update_modal", use_container_width=True):
+            st.session_state["dismiss_build_warn_update"] = False
+            st.rerun()
+        st.divider()
+    
+    update_branch = st.text_input(
+        "🌿 اسم الفرع (Branch):",
+        value=current_branch if current_branch != "-" else "main",
+        key="update_github_branch_key"
+    )
+    update_commit = st.text_input(
+        "📝 رسالة الـ Commit (Commit Message):",
+        value="feat: update Mobiles-spec data & specs",
+        key="update_github_commit_key"
+    )
+    
+    if st.button("🔄 حفظ ورفع التحديثات (Update & Refresh)", key="btn_exec_update_github", type="primary", use_container_width=True):
+        clean_commit_msg = update_commit.strip() if update_commit.strip() else "feat: update Mobiles-spec data & specs"
+        with st.spinner("جاري حفظ التعديلات والمزامنة والرفع إلى GitHub..."):
+            success, log_msg = update_project_on_github(
+                commit_message=clean_commit_msg,
+                branch_name=update_branch,
+                repo_url=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL
+            )
+            if success:
+                st.session_state["github_success_event"] = {
+                    "title": "تم الرفع والتحديث الي منصة Git Hub بنجاح",
+                    "repo_url": DEFAULT_PROJECT_WEB_URL,
+                    "branch": update_branch,
+                    "action": "update",
+                    "log": log_msg
+                }
+                st.rerun()
+            else:
+                st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
+                st.code(log_msg, language="bash")
+
+
+with top_git_col3:
+    if st.button("🚀 Export to GitHub", key="btn_open_export_modal", type="secondary", use_container_width=True):
+        show_export_github_dialog(target_remote_url, current_branch)
 
 with top_git_col4:
-    with st.popover("🔄 Update GitHub", use_container_width=True):
-        st.markdown("### 🔄 تحديث ومزامنة مستودع GitHub")
-        st.markdown(f"""
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 13px;">
-            <b>🔗 المستودع المرتبط:</b> <a href="{DEFAULT_PROJECT_WEB_URL}" target="_blank" style="color: #34D399; text-decoration: none; font-weight: 700;">hzayed3030-cell/Mobiles-spec</a><br>
-            <b>🌿 الفرع الحالي:</b> <code style="color: #A7F3D0;">{current_branch}</code> | <b>آخر Commit:</b> <small>{git_info_quick.get('last_commit', '-')}</small>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # عرض حالة التعديلات الحالية
-        if git_summary.get("total_changes", 0) > 0:
-            st.info(f"📝 يوجد **{git_summary['total_changes']}** ملفات بها تعديلات جاهزة للمزامنة:")
-            with st.expander("📂 استعراض قائمة الملفات المعدلة", expanded=False):
-                for f_item in git_summary.get("files", [])[:15]:
-                    st.caption(f"{f_item['icon']} `{f_item['name']}` ({f_item['type']})")
-        else:
-            st.success("🟢 المستودع نظيف ومحدث محلياً، يمكنك عمل مزامنة ورفع فوري.")
-            
-        # فحص وجود فهارس build / dist
-        detected_build_update = check_large_build_dirs()
-        if detected_build_update and not st.session_state.get("dismiss_build_warn_update", False):
-            st.error("🚨 تنبيه: توجد فهارس Build / Dist خاصة بـ EXE في المشروع. يرجى حذفها أولاً لتتمكن من التحديث.")
-            col_u_act1, col_u_act2 = st.columns([0.62, 0.38], gap="small")
-            with col_u_act1:
-                if st.button("🗑️ حذف فهارس Build و Dist الآن", key="btn_del_build_update", type="primary", use_container_width=True):
-                    s_del, msg_del = delete_build_dirs()
-                    if s_del:
-                        st.success("✅ تم الحذف بنجاح!")
-                        st.session_state["dismiss_build_warn_update"] = False
-                        st.rerun()
-                    else:
-                        st.error(f"خطأ: {msg_del}")
-            with col_u_act2:
-                if st.button("🔙 إلغاء والعودة", key="btn_cancel_del_update", type="secondary", use_container_width=True):
-                    st.session_state["dismiss_build_warn_update"] = True
-                    st.rerun()
-            st.divider()
-        elif detected_build_update and st.session_state.get("dismiss_build_warn_update", False):
-            st.info("ℹ️ تم إلغاء التحديث السابق. فهارس Build / Dist موجودة كما هي دون تعديل.")
-            if st.button("🔄 إعادة فحص الفهارس للتحديث", key="btn_reset_build_warn_update", use_container_width=True):
-                st.session_state["dismiss_build_warn_update"] = False
-                st.rerun()
-            st.divider()
-        
-        update_branch = st.text_input(
-            "🌿 اسم الفرع (Branch):",
-            value=current_branch if current_branch != "-" else "main",
-            key="update_github_branch_key"
-        )
-        update_commit = st.text_input(
-            "📝 رسالة الـ Commit (Commit Message):",
-            value="feat: update Mobiles-spec data & specs",
-            key="update_github_commit_key"
-        )
-        
-        if st.button("🔄 حفظ ورفع التحديثات (Update & Refresh)", key="btn_exec_update_github", type="primary", use_container_width=True):
-            clean_commit_msg = update_commit.strip() if update_commit.strip() else "feat: update Mobiles-spec data & specs"
-            with st.spinner("جاري حفظ التعديلات والمزامنة والرفع إلى GitHub..."):
-                success, log_msg = update_project_on_github(
-                    commit_message=clean_commit_msg,
-                    branch_name=update_branch,
-                    repo_url=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL
-                )
-                if success:
-                    st.session_state["github_success_event"] = {
-                        "title": "تم الرفع والتحديث الي منصة Git Hub بنجاح",
-                        "repo_url": DEFAULT_PROJECT_WEB_URL,
-                        "branch": update_branch,
-                        "action": "update",
-                        "log": log_msg
-                    }
-                    st.rerun()
-                else:
-                    st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
-                    st.code(log_msg, language="bash")
+    if st.button("🔄 Update GitHub", key="btn_open_update_modal", type="secondary", use_container_width=True):
+        show_update_github_dialog(target_remote_url, current_branch, git_summary, git_info_quick)
 
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 

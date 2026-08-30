@@ -1115,12 +1115,18 @@ with top_git_col3:
                     branch_name=export_branch
                 )
                 if success:
-                    st.success("✅ تم تصدير ورفع المشروع إلى GitHub بنجاح!")
                     clean_web = clean_exp.replace(".git", "").replace("git@github.com:", "https://github.com/").strip()
-                    st.link_button("🌐 فتح المستودع الآن على GitHub", url=clean_web, type="primary", use_container_width=True)
+                    st.session_state["github_success_event"] = {
+                        "title": "تم الرفع الي منصة Git Hub بنجاح",
+                        "repo_url": clean_web,
+                        "branch": export_branch,
+                        "action": "export",
+                        "log": log_msg
+                    }
+                    st.rerun()
                 else:
                     st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
-                st.code(log_msg, language="bash")
+                    st.code(log_msg, language="bash")
 
 with top_git_col4:
     with st.popover("🔄 Update GitHub", use_container_width=True):
@@ -1187,14 +1193,103 @@ with top_git_col4:
                     repo_url=target_remote_url if target_remote_url != "-" else DEFAULT_PROJECT_GITHUB_URL
                 )
                 if success:
-                    st.success("✅ تم تحديث ومزامنة المستودع بنجاح!")
-                    commit_history_url = f"{DEFAULT_PROJECT_WEB_URL}/commits/{update_branch}"
-                    st.link_button("📜 عرض سجل التحديثات على GitHub", url=commit_history_url, type="primary", use_container_width=True)
+                    st.session_state["github_success_event"] = {
+                        "title": "تم الرفع والتحديث الي منصة Git Hub بنجاح",
+                        "repo_url": DEFAULT_PROJECT_WEB_URL,
+                        "branch": update_branch,
+                        "action": "update",
+                        "log": log_msg
+                    }
+                    st.rerun()
                 else:
                     st.warning("⚠️ اكتملت العملية مع التقرير التالي:")
-                st.code(log_msg, language="bash")
+                    st.code(log_msg, language="bash")
 
 st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 5.6 بانر وصافرة الاحتفال بالرفع الناجح إلى GitHub (Large Success Banner & Audio Whistle)
+# -----------------------------------------------------------------------------
+if st.session_state.get("github_success_event"):
+    gh_evt = st.session_state["github_success_event"]
+    gh_title = gh_evt.get("title", "تم الرفع الي منصة Git Hub بنجاح")
+    gh_url = gh_evt.get("repo_url", DEFAULT_PROJECT_WEB_URL)
+    gh_branch = gh_evt.get("branch", "main")
+    gh_log = gh_evt.get("log", "")
+    
+    # 1. إطلاق البالونات الاحتفالية
+    st.balloons()
+    
+    # 2. تشغيل صافرة ونغمة الاحتفال بواسطة Web Audio API
+    components.html("""
+    <script>
+    (function() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                const ctx = new AudioCtx();
+                // Whistle / celebratory fanfare chime sequence
+                const notes = [
+                    { f: 587.33, start: 0.00, dur: 0.14, type: 'sine' },
+                    { f: 880.00, start: 0.12, dur: 0.16, type: 'sine' },
+                    { f: 1174.66, start: 0.26, dur: 0.20, type: 'triangle' },
+                    { f: 1760.00, start: 0.44, dur: 0.45, type: 'sine' },
+                    { f: 2093.00, start: 0.52, dur: 0.55, type: 'sine' }
+                ];
+                notes.forEach(n => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = n.type;
+                    osc.frequency.setValueAtTime(n.f, ctx.currentTime + n.start);
+                    gain.gain.setValueAtTime(0.35, ctx.currentTime + n.start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.start + n.dur);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + n.start);
+                    osc.stop(ctx.currentTime + n.start + n.dur);
+                });
+            }
+        } catch(e) {}
+    })();
+    </script>
+    """, height=0, width=0)
+    
+    # 3. عرض البانر الكبير جداً على الشاشة الرئيسية
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #064E3B 0%, #047857 50%, #059669 100%); color: #FFFFFF; padding: 24px 28px; border-radius: 18px; border: 3px solid #34D399; box-shadow: 0 12px 36px rgba(5, 150, 105, 0.45); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 18px;">
+                <div style="background: rgba(255,255,255,0.2); border: 2px solid #A7F3D0; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 4px 16px rgba(0,0,0,0.2);">
+                    🎉
+                </div>
+                <div>
+                    <div style="font-size: 26px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.3); letter-spacing: -0.5px;">
+                        {gh_title}
+                    </div>
+                    <div style="font-size: 15px; font-weight: 700; color: #DCFCE7; margin-top: 5px;">
+                        🚀 تم ربط ومزامنة كافة ملفات ومواصفات المشروع بنجاح على المستودع: <b style="color: #FEF08A; text-decoration: underline;">hzayed3030-cell/Mobiles-spec</b> (الفرع: <code style="color: #FFFFFF; background: rgba(0,0,0,0.25); padding: 2px 8px; border-radius: 6px;">{gh_branch}</code>)
+                    </div>
+                </div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); border: 1.5px dashed #6EE7B7; border-radius: 12px; padding: 8px 16px; font-size: 13px; font-weight: 800; color: #ECFDF5;">
+                ✅ حالة السحابة: متزامن ومحدث 100%
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_gh_btn1, col_gh_btn2, col_gh_btn3 = st.columns([0.45, 0.35, 0.20], gap="small")
+    with col_gh_btn1:
+        st.link_button("🌐 فتح المستودع الآن على GitHub (Open Repository)", url=gh_url, type="primary", use_container_width=True)
+    with col_gh_btn2:
+        with st.popover("📜 عرض تقرير عملية الرفع (Logs)", use_container_width=True):
+            st.code(gh_log if gh_log else "تمت العملية بنجاح كامل بدون أخطاء.", language="bash")
+    with col_gh_btn3:
+        if st.button("❌ إغلاق ومتابعة العمل", key="btn_dismiss_gh_success", type="secondary", use_container_width=True):
+            del st.session_state["github_success_event"]
+            st.rerun()
+            
+    st.divider()
 
 # -----------------------------------------------------------------------------
 # 6. البانر التعريفي
